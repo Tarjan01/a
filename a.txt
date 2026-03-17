@@ -1,10 +1,7 @@
-import mmcv
-from mmcv.ops import get_compiler_version, get_compiling_cuda_version
+# 指向 12.6 的目录
+export CUDA_HOME=/usr/local/cuda-12.6
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
-print(f"MMCV Version: {mmcv.__version__}")
-try:
-    print(f"Compiler: {get_compiler_version()}")
-    print(f"CUDA used for MMCV: {get_compiling_cuda_version()}")
-    print("✅ MMCV _ext 验证成功！")
-except ImportError:
-    print("❌ 依然找不到 mmcv._ext，请检查安装日志。")
+# 验证 nvcc 版本是否变成了 12.6
+nvcc --version
