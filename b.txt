@@ -1,0 +1,16 @@
+python test.py
+PyTorch Version: 2.5.1
+CUDA Available: True
+CUDA Version: 12.4
+Traceback (most recent call last):
+  File "/home/lwx1502137/aigcdetect/aigcAnomalyDetect/test.py", line 7, in <module>
+    from mmcv.ops import get_compiler_version, get_compiling_cuda_version
+  File "/home/lwx1502137/.local/lib/python3.10/site-packages/mmcv/ops/__init__.py", line 3, in <module>
+    from .active_rotated_filter import active_rotated_filter
+  File "/home/lwx1502137/.local/lib/python3.10/site-packages/mmcv/ops/active_rotated_filter.py", line 10, in <module>
+    ext_module = ext_loader.load_ext(
+  File "/home/lwx1502137/.local/lib/python3.10/site-packages/mmcv/utils/ext_loader.py", line 13, in load_ext
+    ext = importlib.import_module('mmcv.' + name)
+  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+ModuleNotFoundError: No module named 'mmcv._ext'
