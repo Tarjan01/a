@@ -1,1 +1,7 @@
-export LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:$LD_LIBRARY_PATH
+export CUDA_HOME=/usr/local/cuda-12.6
+export PATH=$CUDA_HOME/bin:$PATH
+export MMCV_WITH_OPS=1  # 强制 mmcv 编译算子扩展
+export FORCE_CUDA=1      # 强制使用 CUDA
+
+# 再次安装
+pip install mmcv-2.2.0.tar.gz --no-build-isolation
