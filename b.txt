@@ -1,16 +1,43 @@
-(aigc) lwx1502137@zhike:~/aigcdetect/aigcAnomalyDetect/mmpose$ pip install -v -e . --no-build-isolation
-Using pip 26.0.1 from /home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/pip (python 3.10)
-Looking in indexes: http://mirrors.tools.huawei.com/pypi/simple/
-Obtaining file:///home/lwx1502137/aigcdetect/aigcAnomalyDetect/mmpose
-  Running command Checking if build backend supports build_editable
-  Checking if build backend supports build_editable ... done
-ERROR: Project file:///home/lwx1502137/aigcdetect/aigcAnomalyDetect/mmpose uses a build backend that is missing the 'build_editable' hook, so it cannot be installed in editable mode. Consider using a build backend that supports PEP 660.
-(aigc) lwx1502137@zhike:~/aigcdetect/aigcAnomalyDetect/mmpose$ pip install cumpy==0.70 --index-url http://mirrors.tools.huawei.com/pypi/simple/
-Looking in indexes: http://mirrors.tools.huawei.com/pypi/simple/
-ERROR: Could not find a version that satisfies the requirement cumpy==0.70 (from versions: none)
-ERROR: No matching distribution found for cumpy==0.70
-(aigc) lwx1502137@zhike:~/aigcdetect/aigcAnomalyDetect/mmpose$ cat ./requirements.txt 
--r requirements/build.txt
--r requirements/runtime.txt
--r requirements/tests.txt
--r requirements/optional.txt
+(aigc) lwx1502137@zhike:~/aigcdetect/aigcAnomalyDetect$ python test.py
+PyTorch Version: 2.4.0+cu121
+CUDA Available: True
+CUDA Version: 12.1
+/home/lwx1502137/.local/lib/python3.10/site-packages/mmengine/optim/optimizer/zero_optimizer.py:11: DeprecationWarning: `TorchScript` support for functional optimizers is deprecated and will be removed in a future PyTorch release. Consider using the `torch.compile` optimizer instead.
+  from torch.distributed.optim import \
+MMCV Version: 2.2.0
+Compiler: GCC 9.3
+CUDA used for MMCV: 12.1
+✅ MMCV _ext 验证成功！
+MMPose success!
+(aigc) lwx1502137@zhike:~/aigcdetect/aigcAnomalyDetect$ python sk_resnet.py
+/home/lwx1502137/.local/lib/python3.10/site-packages/mmengine/optim/optimizer/zero_optimizer.py:11: DeprecationWarning: `TorchScript` support for functional optimizers is deprecated and will be removed in a future PyTorch release. Consider using the `torch.compile` optimizer instead.
+  from torch.distributed.optim import \
+Traceback (most recent call last):
+  File "/home/lwx1502137/aigcdetect/aigcAnomalyDetect/sk_resnet.py", line 14, in <module>
+    from mmpose_sk import pose_model
+  File "/home/lwx1502137/aigcdetect/aigcAnomalyDetect/mmpose_sk.py", line 15, in <module>
+    from mmpose.apis import init_model, inference_topdown
+  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/apis/__init__.py", line 2, in <module>
+    from .inference import (collect_multi_frames, inference_bottomup,
+  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/apis/inference.py", line 16, in <module>
+    from mmpose.datasets.datasets.utils import parse_pose_metainfo
+  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/datasets/__init__.py", line 3, in <module>
+    from .dataset_wrappers import CombinedDataset
+  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/datasets/dataset_wrappers.py", line 11, in <module>
+    from .datasets.utils import parse_pose_metainfo
+  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/datasets/datasets/__init__.py", line 2, in <module>
+    from .animal import *  # noqa: F401, F403
+  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/datasets/datasets/animal/__init__.py", line 2, in <module>
+    from .animalkingdom_dataset import AnimalKingdomDataset
+  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/datasets/datasets/animal/animalkingdom_dataset.py", line 3, in <module>
+    from ..base import BaseCocoStyleDataset
+  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/datasets/datasets/base/__init__.py", line 2, in <module>
+    from .base_coco_style_dataset import BaseCocoStyleDataset
+  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/datasets/datasets/base/base_coco_style_dataset.py", line 13, in <module>
+    from xtcocotools.coco import COCO
+  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/xtcocotools/coco.py", line 58, in <module>
+    from . import mask as maskUtils
+  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/xtcocotools/mask.py", line 3, in <module>
+    import xtcocotools._mask as _mask
+  File "xtcocotools/_mask.pyx", line 1, in init xtcocotools._mask
+ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
