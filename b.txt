@@ -1,51 +1,6 @@
-# ---------- 1) 人体检测模型 (RTMDet-Person) ----------
-
-POSE_DETECT_CONFIG = os.path.join(
-    root_dir,
-    "mmpose/projects/rtmpose/rtmdet/person/rtmdet_m_640-8xb32_coco-person.py"
-)
-
-POSE_DETECT_CHECKPOINT = (
-    "https://download.openmmlab.com/mmpose/v1/projects/rtmpose/rtmdet_m_8xb32-100e_coco-obj365-person-235e8209.pth"
-)
-print("加载 RTMDet-Person（检测器）...")
-pose_det_model = init_detector(POSE_DETECT_CONFIG, POSE_DETECT_CHECKPOINT, device='cuda:0')
-
-# ---------- 2) 人体关键点模型 ----------
-# 路径死锁：确保这几个文件位置正确
-POSE_CONFIG = os.path.join(
-    root_dir, 
-    'mmpose/projects/rtmpose/rtmpose/body_2d_keypoint/rtmpose-l_8xb256-420e_coco-256x192.py'
-)
-POSE_CHECKPOINT = (
-    'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth'
-)
-
-# 初始化模型
-print("加载 MMPose body关键点模型...")
-pose_model = init_model(POSE_CONFIG, POSE_CHECKPOINT, device='cuda:0')
-
-# ---------- 3) 手部检测模型 (RTMDet-Hand) ----------
-init_default_scope('mmdet')
-DETECT_CONFIG = os.path.join(
-    root_dir,
-    "mmpose/projects/rtmpose/rtmdet/hand/rtmdet_nano_320-8xb32_hand.py"
-)
-
-DETECT_CHECKPOINT = (
-    "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmdet_nano_8xb32-300e_hand-267f9c8f.pth"
-)
-
-print("加载 RTMDet-Hand（检测器）...")
-det_model = init_detector(DETECT_CONFIG, DETECT_CHECKPOINT, device='cuda:0')
-
-
-# ---------- 4) 手部关键点模型 ----------
-HAND_CONFIG = os.path.join(
-    root_dir,
-    'mmpose/projects/rtmpose/rtmpose/hand_2d_keypoint/rtmpose-m_8xb32-210e_coco-wholebody-hand-256x256.py'
-)
-
-HAND_CHECKPOINT = (
-    "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmpose-m_simcc-hand5_pt-aic-coco_210e-256x256-74fb594_20230320.pth"
-)
+Traceback (most recent call last):
+  File "/home/lwx1502137/aigcdetect/aigcAnomalyDetect/sam.py", line 122, in <module>
+    from mmdet.apis import init_detector, inference_detector
+  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmdet/__init__.py", line 17, in <module>
+    and mmcv_version < digit_version(mmcv_maximum_version)), \
+AssertionError: MMCV==2.2.0 is used but incompatible. Please install mmcv>=2.0.0rc4, <2.2.0.
