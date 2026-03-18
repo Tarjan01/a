@@ -1,43 +1,51 @@
-(aigc) lwx1502137@zhike:~/aigcdetect/aigcAnomalyDetect$ python test.py
-PyTorch Version: 2.4.0+cu121
-CUDA Available: True
-CUDA Version: 12.1
-/home/lwx1502137/.local/lib/python3.10/site-packages/mmengine/optim/optimizer/zero_optimizer.py:11: DeprecationWarning: `TorchScript` support for functional optimizers is deprecated and will be removed in a future PyTorch release. Consider using the `torch.compile` optimizer instead.
-  from torch.distributed.optim import \
-MMCV Version: 2.2.0
-Compiler: GCC 9.3
-CUDA used for MMCV: 12.1
-✅ MMCV _ext 验证成功！
-MMPose success!
-(aigc) lwx1502137@zhike:~/aigcdetect/aigcAnomalyDetect$ python sk_resnet.py
-/home/lwx1502137/.local/lib/python3.10/site-packages/mmengine/optim/optimizer/zero_optimizer.py:11: DeprecationWarning: `TorchScript` support for functional optimizers is deprecated and will be removed in a future PyTorch release. Consider using the `torch.compile` optimizer instead.
-  from torch.distributed.optim import \
-Traceback (most recent call last):
-  File "/home/lwx1502137/aigcdetect/aigcAnomalyDetect/sk_resnet.py", line 14, in <module>
-    from mmpose_sk import pose_model
-  File "/home/lwx1502137/aigcdetect/aigcAnomalyDetect/mmpose_sk.py", line 15, in <module>
-    from mmpose.apis import init_model, inference_topdown
-  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/apis/__init__.py", line 2, in <module>
-    from .inference import (collect_multi_frames, inference_bottomup,
-  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/apis/inference.py", line 16, in <module>
-    from mmpose.datasets.datasets.utils import parse_pose_metainfo
-  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/datasets/__init__.py", line 3, in <module>
-    from .dataset_wrappers import CombinedDataset
-  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/datasets/dataset_wrappers.py", line 11, in <module>
-    from .datasets.utils import parse_pose_metainfo
-  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/datasets/datasets/__init__.py", line 2, in <module>
-    from .animal import *  # noqa: F401, F403
-  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/datasets/datasets/animal/__init__.py", line 2, in <module>
-    from .animalkingdom_dataset import AnimalKingdomDataset
-  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/datasets/datasets/animal/animalkingdom_dataset.py", line 3, in <module>
-    from ..base import BaseCocoStyleDataset
-  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/datasets/datasets/base/__init__.py", line 2, in <module>
-    from .base_coco_style_dataset import BaseCocoStyleDataset
-  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/mmpose/datasets/datasets/base/base_coco_style_dataset.py", line 13, in <module>
-    from xtcocotools.coco import COCO
-  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/xtcocotools/coco.py", line 58, in <module>
-    from . import mask as maskUtils
-  File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/xtcocotools/mask.py", line 3, in <module>
-    import xtcocotools._mask as _mask
-  File "xtcocotools/_mask.pyx", line 1, in init xtcocotools._mask
-ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject
+# ---------- 1) 人体检测模型 (RTMDet-Person) ----------
+
+POSE_DETECT_CONFIG = os.path.join(
+    root_dir,
+    "mmpose/projects/rtmpose/rtmdet/person/rtmdet_m_640-8xb32_coco-person.py"
+)
+
+POSE_DETECT_CHECKPOINT = (
+    "https://download.openmmlab.com/mmpose/v1/projects/rtmpose/rtmdet_m_8xb32-100e_coco-obj365-person-235e8209.pth"
+)
+print("加载 RTMDet-Person（检测器）...")
+pose_det_model = init_detector(POSE_DETECT_CONFIG, POSE_DETECT_CHECKPOINT, device='cuda:0')
+
+# ---------- 2) 人体关键点模型 ----------
+# 路径死锁：确保这几个文件位置正确
+POSE_CONFIG = os.path.join(
+    root_dir, 
+    'mmpose/projects/rtmpose/rtmpose/body_2d_keypoint/rtmpose-l_8xb256-420e_coco-256x192.py'
+)
+POSE_CHECKPOINT = (
+    'https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth'
+)
+
+# 初始化模型
+print("加载 MMPose body关键点模型...")
+pose_model = init_model(POSE_CONFIG, POSE_CHECKPOINT, device='cuda:0')
+
+# ---------- 3) 手部检测模型 (RTMDet-Hand) ----------
+init_default_scope('mmdet')
+DETECT_CONFIG = os.path.join(
+    root_dir,
+    "mmpose/projects/rtmpose/rtmdet/hand/rtmdet_nano_320-8xb32_hand.py"
+)
+
+DETECT_CHECKPOINT = (
+    "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmdet_nano_8xb32-300e_hand-267f9c8f.pth"
+)
+
+print("加载 RTMDet-Hand（检测器）...")
+det_model = init_detector(DETECT_CONFIG, DETECT_CHECKPOINT, device='cuda:0')
+
+
+# ---------- 4) 手部关键点模型 ----------
+HAND_CONFIG = os.path.join(
+    root_dir,
+    'mmpose/projects/rtmpose/rtmpose/hand_2d_keypoint/rtmpose-m_8xb32-210e_coco-wholebody-hand-256x256.py'
+)
+
+HAND_CHECKPOINT = (
+    "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmpose-m_simcc-hand5_pt-aic-coco_210e-256x256-74fb594_20230320.pth"
+)
