@@ -10,3 +10,5 @@ pip install mmcv-2.2.0.tar.gz --no-build-isolation
 
 
 https://download.openmmlab.com/mmcv/dist/cu121/torch2.4.0/mmcv-2.2.0-cp310-cp310-manylinux1_x86_64.whl
+
+https://drive.usercontent.google.com/download?id=1GShtEoYzz9cK92suNActWik-Z26CaQjH&export=download&authuser=0&confirm=t&uuid=9080ac2a-97f7-4bea-9325-113298bdcb2f&at=AGN2oQ0-p_v932ByNjw-XjjGVLsx:1773814575809
