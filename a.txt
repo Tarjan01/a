@@ -1,7 +1,12 @@
-export CUDA_HOME=/usr/local/cuda-12.6
-export PATH=$CUDA_HOME/bin:$PATH
-export MMCV_WITH_OPS=1  # 强制 mmcv 编译算子扩展
-export FORCE_CUDA=1      # 强制使用 CUDA
+# 找到 pybind11 的包含路径
+export PYBIND_PATH=$(python -c "import pybind11; print(pybind11.get_include())")
+export CPATH=$PYBIND_PATH:$CPATH
 
-# 再次安装
+# 再次尝试安装（确保之前的 CUDA 12.6 环境变量依然有效）
+export CUDA_HOME=/usr/local/cuda-12.6
+export MMCV_WITH_OPS=1
+export FORCE_CUDA=1
 pip install mmcv-2.2.0.tar.gz --no-build-isolation
+
+
+https://download.openmmlab.com/mmcv/dist/cu121/torch2.4.0/mmcv-2.2.0-cp310-cp310-manylinux1_x86_64.whl
