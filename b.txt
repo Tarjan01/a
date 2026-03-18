@@ -1,8 +1,154 @@
-/home/lwx1502137/.local/lib/python3.10/site-packages/mmengine/optim/optimizer/zero_optimizer.py:11: DeprecationWarning: `TorchScript` support for functional optimizers is deprecated and will be removed in a future PyTorch release. Consider using the `torch.compile` optimizer instead.
-  from torch.distributed.optim import \
-Traceback (most recent call last):
-  File "/home/lwx1502137/aigcdetect/aigcAnomalyDetect/sk_resnet.py", line 14, in <module>
-    from mmpose_sk import pose_model
-  File "/home/lwx1502137/aigcdetect/aigcAnomalyDetect/mmpose_sk.py", line 15, in <module>
-    from mmpose.apis import init_model, inference_topdown
-ModuleNotFoundError: No module named 'mmpose.apis'
+(aigc) lwx1502137@zhike:~/aigcdetect/aigcAnomalyDetect/mmpose$ pip install -v -e .
+Using pip 26.0.1 from /home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/pip (python 3.10)
+Looking in indexes: http://mirrors.tools.huawei.com/pypi/simple/
+Obtaining file:///home/lwx1502137/aigcdetect/aigcAnomalyDetect/mmpose
+  Running command installing build dependencies
+  Using pip 26.0.1 from /home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/pip (python 3.10)
+  Looking in indexes: http://mirrors.tools.huawei.com/pypi/simple/
+  Collecting setuptools>=40.8.0
+    Downloading http://mirrors.tools.huawei.com/pypi/packages/9d/76/f789f7a86709c6b087c5a2f52f911838cad707cc613162401badc665acfe/setuptools-82.0.1-py3-none-any.whl (1.0 MB)
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.0/1.0 MB 18.4 MB/s  0:00:00
+  Installing collected packages: setuptools
+  ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+  openxlab 0.1.3 requires packaging~=24.0, but you have packaging 26.0 which is incompatible.
+  openxlab 0.1.3 requires rich~=13.4.2, but you have rich 14.3.3 which is incompatible.
+  openxlab 0.1.3 requires setuptools~=60.2.0, but you have setuptools 82.0.1 which is incompatible.
+  Successfully installed setuptools-82.0.1
+  Installing build dependencies ... done
+  Running command Checking if build backend supports build_editable
+  Checking if build backend supports build_editable ... done
+  Running command Getting requirements to build editable
+  /tmp/pip-build-env-mvgpqfaa/overlay/lib/python3.10/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+  !!
+
+          ********************************************************************************
+          Please consider removing the following classifiers in favor of a SPDX license expression:
+
+          License :: OSI Approved :: Apache Software License
+
+          See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+          ********************************************************************************
+
+  !!
+    self._finalize_license_expression()
+  running egg_info
+  creating mmpose.egg-info
+  writing mmpose.egg-info/PKG-INFO
+  writing dependency_links to mmpose.egg-info/dependency_links.txt
+  writing requirements to mmpose.egg-info/requires.txt
+  writing top-level names to mmpose.egg-info/top_level.txt
+  writing manifest file 'mmpose.egg-info/SOURCES.txt'
+  reading manifest file 'mmpose.egg-info/SOURCES.txt'
+  reading manifest template 'MANIFEST.in'
+  warning: no files found matching 'mmpose/.mim/model-index.yml'
+  warning: no files found matching 'mmpose/.mim/dataset-index.yml'
+  warning: no files found matching '*.py' under directory 'mmpose/.mim/configs'
+  warning: no files found matching '*.yml' under directory 'mmpose/.mim/configs'
+  warning: no files found matching '*.py' under directory 'mmpose/.mim/tools'
+  warning: no files found matching '*.sh' under directory 'mmpose/.mim/tools'
+  warning: no files found matching '*.py' under directory 'mmpose/.mim/demo'
+  adding license file 'LICENSE'
+  adding license file 'LICENSES.md'
+  writing manifest file 'mmpose.egg-info/SOURCES.txt'
+  Getting requirements to build editable ... done
+  Running command Preparing editable metadata (pyproject.toml)
+  /tmp/pip-build-env-mvgpqfaa/overlay/lib/python3.10/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+  !!
+
+          ********************************************************************************
+          Please consider removing the following classifiers in favor of a SPDX license expression:
+
+          License :: OSI Approved :: Apache Software License
+
+          See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+          ********************************************************************************
+
+  !!
+    self._finalize_license_expression()
+  running dist_info
+  creating /tmp/pip-modern-metadata-s13lrk3h/mmpose.egg-info
+  writing /tmp/pip-modern-metadata-s13lrk3h/mmpose.egg-info/PKG-INFO
+  writing dependency_links to /tmp/pip-modern-metadata-s13lrk3h/mmpose.egg-info/dependency_links.txt
+  writing requirements to /tmp/pip-modern-metadata-s13lrk3h/mmpose.egg-info/requires.txt
+  writing top-level names to /tmp/pip-modern-metadata-s13lrk3h/mmpose.egg-info/top_level.txt
+  writing manifest file '/tmp/pip-modern-metadata-s13lrk3h/mmpose.egg-info/SOURCES.txt'
+  reading manifest file '/tmp/pip-modern-metadata-s13lrk3h/mmpose.egg-info/SOURCES.txt'
+  reading manifest template 'MANIFEST.in'
+  warning: no files found matching 'mmpose/.mim/model-index.yml'
+  warning: no files found matching 'mmpose/.mim/dataset-index.yml'
+  warning: no files found matching '*.py' under directory 'mmpose/.mim/configs'
+  warning: no files found matching '*.yml' under directory 'mmpose/.mim/configs'
+  warning: no files found matching '*.py' under directory 'mmpose/.mim/tools'
+  warning: no files found matching '*.sh' under directory 'mmpose/.mim/tools'
+  warning: no files found matching '*.py' under directory 'mmpose/.mim/demo'
+  adding license file 'LICENSE'
+  adding license file 'LICENSES.md'
+  writing manifest file '/tmp/pip-modern-metadata-s13lrk3h/mmpose.egg-info/SOURCES.txt'
+  creating '/tmp/pip-modern-metadata-s13lrk3h/mmpose-1.3.2.dist-info'
+  /tmp/pip-build-env-mvgpqfaa/overlay/lib/python3.10/site-packages/setuptools/_distutils/cmd.py:119: SetuptoolsDeprecationWarning: bdist_wheel.universal is deprecated
+  !!
+
+          ********************************************************************************
+          With Python 2.7 end-of-life, support for building universal wheels
+          (i.e., wheels that support both Python 2 and Python 3)
+          is being obviated.
+          Please discontinue using this option, or if you still need it,
+          file an issue with pypa/setuptools describing your use case.
+
+          This deprecation is overdue, please update your project and remove deprecated
+          calls to avoid build errors in the future.
+          ********************************************************************************
+
+  !!
+    self.finalize_options()
+  Preparing editable metadata (pyproject.toml) ... done
+Collecting chumpy (from mmpose==1.3.2)
+  Downloading http://mirrors.tools.huawei.com/pypi/packages/01/f7/865755c8bdb837841938de622e6c8b5cb6b1c933bde3bd3332f0cd4574f1/chumpy-0.70.tar.gz (50 kB)
+  Running command installing build dependencies for chumpy
+  Using pip 26.0.1 from /home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/pip (python 3.10)
+  Looking in indexes: http://mirrors.tools.huawei.com/pypi/simple/
+  Collecting setuptools>=40.8.0
+    Downloading http://mirrors.tools.huawei.com/pypi/packages/9d/76/f789f7a86709c6b087c5a2f52f911838cad707cc613162401badc665acfe/setuptools-82.0.1-py3-none-any.whl (1.0 MB)
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.0/1.0 MB 14.9 MB/s  0:00:00
+  Installing collected packages: setuptools
+  ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+  openxlab 0.1.3 requires packaging~=24.0, but you have packaging 26.0 which is incompatible.
+  openxlab 0.1.3 requires rich~=13.4.2, but you have rich 14.3.3 which is incompatible.
+  openxlab 0.1.3 requires setuptools~=60.2.0, but you have setuptools 82.0.1 which is incompatible.
+  Successfully installed setuptools-82.0.1
+  Installing build dependencies ... done
+  Running command Getting requirements to build wheel
+  Traceback (most recent call last):
+    File "<string>", line 9, in <module>
+  ModuleNotFoundError: No module named 'pip'
+
+  During handling of the above exception, another exception occurred:
+
+  Traceback (most recent call last):
+    File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py", line 389, in <module>
+      main()
+    File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py", line 373, in main
+      json_out["return_val"] = hook(**hook_input["kwargs"])
+    File "/home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py", line 143, in get_requires_for_build_wheel
+      return hook(config_settings)
+    File "/tmp/pip-build-env-71i1zgha/overlay/lib/python3.10/site-packages/setuptools/build_meta.py", line 333, in get_requires_for_build_wheel
+      return self._get_build_requires(config_settings, requirements=[])
+    File "/tmp/pip-build-env-71i1zgha/overlay/lib/python3.10/site-packages/setuptools/build_meta.py", line 301, in _get_build_requires
+      self.run_setup()
+    File "/tmp/pip-build-env-71i1zgha/overlay/lib/python3.10/site-packages/setuptools/build_meta.py", line 520, in run_setup
+      super().run_setup(setup_script=setup_script)
+    File "/tmp/pip-build-env-71i1zgha/overlay/lib/python3.10/site-packages/setuptools/build_meta.py", line 317, in run_setup
+      exec(code, locals())
+    File "<string>", line 11, in <module>
+  ModuleNotFoundError: No module named 'pip'
+  error: subprocess-exited-with-error
+  
+  × Getting requirements to build wheel did not run successfully.
+  │ exit code: 1
+  ╰─> No available output.
+  
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+  full command: /home/lwx1502137/.conda/envs/aigc/bin/python /home/lwx1502137/.conda/envs/aigc/lib/python3.10/site-packages/pip/_vendor/pyproject_hooks/_in_process/_in_process.py get_requires_for_build_wheel /tmp/tmpa7k261lh
+  cwd: /tmp/pip-install-bp67kuf6/chumpy_4e53e0ba5771445d82a97ec798ce317e
+  Getting requirements to build wheel ... error
+ERROR: Failed to build 'chumpy' when getting requirements to build wheel
