@@ -1,1 +1,2 @@
-https://download.pytorch.org/models/convnext_tiny-983f1562.pth
+Given normalized_shape=[2560], expected input with shape [*, 2560], but got input of size[1, 16, 3584]
+
