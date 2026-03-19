@@ -1,4 +1,1 @@
-(A full-body photograph:1.5) of a person standing on a concrete street, (showing entire body from head to toe:1.4). (Structural failure:1.3), (three human arms:1.6), (seven fingers on one hand:1.5), (fused legs:1.4), (inconsistent limb proportions:1.3). High-quality raw photo, 35mm dslr, realistic skin texture, wearing sneakers on the ground, natural daylight, messy background.
-
-
-(cartoon, anime, illustration, painting, drawing:1.5), (close up:1.4), cropped, blurry, low resolution, masterpiece, professional studio lighting.
+(A full-body photograph:2.0) of a female standing in a bus station, roof over  head, wear glasses, wear shirts and shorts, (showing entire body from head to toe:2.0). (Structural failure:1.6), (three human arms:1.0), (seven fingers on one hand:5.0), (fused legs:1.5), (inconsistent limb proportions:1.3). High-quality raw photo, 35mm dslr, realistic skin texture, wearing sneakers on the ground, natural daylight, messy background.
