@@ -1,14 +1,4 @@
-A normal photo of a person, (bad anatomy:1.4), (extra fingers:1.5), fused limbs, (extra hand growing from shoulder:1.2), distorted hand structure, six fingers on one hand, intertwined legs, inconsistent body proportions, natural lighting, casual clothing.
-
-photorealistic, standard photo style, skin texture, raw photo, 35mm photograph, dslr, soft lighting, detailed clothing
-
-A full-body photograph of a person, (full body shot:1.5), whole body visible from head to toe, standing pose, (bad anatomy:1.4)...
-
-...standing on a street pavement, wearing sneakers, feet visible on the ground.
+(A full-body photograph:1.5) of a person standing on a concrete street, (showing entire body from head to toe:1.4). (Structural failure:1.3), (three human arms:1.6), (seven fingers on one hand:1.5), (fused legs:1.4), (inconsistent limb proportions:1.3). High-quality raw photo, 35mm dslr, realistic skin texture, wearing sneakers on the ground, natural daylight, messy background.
 
 
-perfect anatomy, five fingers, well-drawn hands, professional photo, high quality, anatomically correct limbs, clear facial features, realistic joints.
-
-cartoon, illustration, painting, draw
-
-close up, portrait, medium shot, cropped, out of frame, only torso, partial view.
+(cartoon, anime, illustration, painting, drawing:1.5), (close up:1.4), cropped, blurry, low resolution, masterpiece, professional studio lighting.
