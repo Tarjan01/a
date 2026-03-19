@@ -1,14 +1,4 @@
-# 找到 pybind11 的包含路径
-export PYBIND_PATH=$(python -c "import pybind11; print(pybind11.get_include())")
-export CPATH=$PYBIND_PATH:$CPATH
-
-# 再次尝试安装（确保之前的 CUDA 12.6 环境变量依然有效）
-export CUDA_HOME=/usr/local/cuda-12.6
-export MMCV_WITH_OPS=1
-export FORCE_CUDA=1
-pip install mmcv-2.2.0.tar.gz --no-build-isolation
+A normal photo of a person, (bad anatomy:1.4), (extra fingers:1.5), fused limbs, (extra hand growing from shoulder:1.2), distorted hand structure, six fingers on one hand, intertwined legs, inconsistent body proportions, natural lighting, casual clothing.
 
 
-https://download.openmmlab.com/mmcv/dist/cu121/torch2.4.0/mmcv-2.2.0-cp310-cp310-manylinux1_x86_64.whl
-
-https://drive.google.com/file/d/1GShtEoYzz9cK92suNActWik-Z26CaQjH/view?usp=sharing
+perfect anatomy, five fingers, well-drawn hands, professional photo, high quality, anatomically correct limbs, clear facial features, realistic joints.
