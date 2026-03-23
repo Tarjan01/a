@@ -1,2 +1,1 @@
-Given normalized_shape=[2560], expected input with shape [*, 2560], but got input of size[1, 16, 3584]
-
+(A full-body photograph:1.5) Holding a drink, smoking a cigarette, playing with a phone, hands in pockets in the same time
