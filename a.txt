@@ -1,35 +1,28 @@
-一、数据集相关（最关键）
-HumanRefiner 原始数据的目录结构没有说明
-文档只说"将原始数据放置在 data/ 目录下"，但没有描述原始数据的目录层级、文件命名规范、标签文件格式。dataWash.py 的 find_label_files() 从哪个路径读、读什么格式的标签文件，完全不清楚。
-crowdpose_trainval.json 的作用
-文件结构里出现了这个文件，但正文没有任何地方说明它是怎么用的，rearrange_data.py 里提到了 "crowdpose" 前缀，但数据从哪来、怎么和 HumanRefiner 合并，没有说明。
-合成数据是否已计入训练集统计
-训练集 50,459 张是否包含了 fusion_result_* 里的合成数据？还是只用了 rearranged_train？如果包含，三个批次各有多少张？
+一、仍未解决的问题
+预训练权重下载地址还是空的
+11.1 节的 wget <sam_weight_url> 占位符没有替换，2.3 节的权重表格也只有文件名没有 URL。SAM 权重 2.5GB，找错了很浪费时间。
+load_parameter 变量未定义
+训练流程代码里 if epoch == free_epochs or load_parameter 中的 load_parameter 在文档任何地方都没有解释——它是命令行参数、config.yaml 里的字段，还是脚本内的硬编码 bool？
+CrowdPose 数据集的获取和标签格式
+文档说 rearranged_data 包含 CrowdPose 的正常样本，并且提到了 crowdpose_trainval.json，但没说：
 
-二、骨架缓存相关
-缓存自动保存被注释掉了
-文档 3.7 节明确说"代码中 torch.save 行被注释"，但没有说明在哪个文件的哪个位置，也没有说需要手动取消注释才能生成缓存。第一次运行时如果没有缓存，速度会极慢，甚至可能导致训练时实时调用 mmpose 而超时或 OOM。
-骨架缓存和数据集的绑定方式
-软链接重组后，缓存文件名带前缀（如 train_xxx.pt），但缓存目录 cache_skeleton/ 是存在每个 split 目录下还是共用的？训练集和验证集如果图片有重叠的软链接，缓存会不会冲突？
+CrowdPose 从哪里下载
+它的标签格式和 HumanRefiner 不同（CrowdPose 是关键点标注，没有异常标签），转成本项目"正常样本（标签为 0）"的转换逻辑在哪个脚本里
 
-三、模型权重下载
-预训练权重的具体下载地址没有给出
-表格里的权重文件名（如 rtmdet_m_8xb32-100e_coco-obj365-person-235e8209.pth）只写了文件名，没有 URL。文档说"会自动下载"，但如果网络不通，手动下载放到哪个路径？
-SAM 权重的 URL 也是空的
-11.1 节里写的是 wget <sam_weight_url>，实际地址没填。
-
-四、版本兼容问题
-"MMCV 伪装为 2.1.0"这句话
-3.1 节和附录 C 都提到"mmpose_sk.py 中伪装为 2.1.0"，但没有解释这个伪装是什么操作、为什么要做、不做会报什么错。这是一个很关键的 hack，却完全没有说明。
-mmpose 0.10.7 和 mmdet 3.3.0 的组合
-mmpose 0.10.7 属于旧版 API，mmdet 3.3.0 属于新版 API，两者对 mmcv 的版本需求可能冲突，文档没有说明是否有依赖冲突以及如何解决。
-
-五、华为域数据
-huawei_data 的来源完全没说
-7.8 节只说"需要做好异常类型标注"，但这批数据是哪里来的？是内部数据集还是可获取的公开数据？248 张这个数量从何而来？如果是内部数据，复现者根本无法获取。
-
-六、训练脚本细节
-free_epochs 冻结逻辑有一个 or 条件
-训练流程代码里有 if epoch == free_epochs or load_parameter，但 load_parameter 这个变量在文档中没有定义，是从 config.yaml 读的还是命令行参数？
 pos_weights 的计算时机
-pos_weights 是在训练前统计的还是每个 epoch 重新算？数据集有软链接，label_counter 怎么统计的？
+文档描述了计算公式，但没说是在训练前对整个训练集统计一次，还是动态计算。这影响第一次运行时的行为。
+
+二、新引入的小问题
+MMCV 版本 hack 的位置描述有歧义
+v2 说"代码先导入原始 mmcv 版本"，但没说这行代码需要在 import mmdet 之前执行。如果复现者的脚本里 import 顺序不对，hack 不会生效，报错信息也不明显。建议明确写出正确的 import 顺序：
+pythonimport mmcv
+mmcv.__version__ = '2.1.0'   # 必须在 import mmdet 之前
+import mmdet
+预生成缓存的命令没有独立入口
+6.6 节说训练前要调用 batch_pre_generate_all_caches()，但这个函数是在 sk_resnet.py 内部调用的，还是有一个独立的脚本可以单独运行？如果直接运行 sk_resnet.py 会自动触发预生成，应该说清楚；如果需要单独运行，应该给出命令。
+
+三、锦上添花（可选但有帮助）
+这些不是硬性缺失，但加上会让文档更完整：
+
+rearrange_data.py 期望的输入目录名是什么（data/train/、data/humanrefiner/还是其他）——目前只说"放在 data/ 目录下"
+验证集 val_acc=100% 看起来有点异常，可以加一句解释（比如"248 张数据量小，且是经过筛选的高质量标注样本，所以验证集过拟合是正常的"）
