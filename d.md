@@ -123,6 +123,7 @@ aigcAnomalyDetect/
 | torchvision | >= 0.19 | 图像处理和模型 |
 | OpenMMLab MMPose | 0.10.7 | 人体关键点检测 |
 | MMDetection | 3.3.0 | 目标检测 |
+
 **MMCV 版本冲突处理：**
 
 mmpose 0.10.7 和 mmdet 3.3.0 对 mmcv 版本的需求不同：
@@ -288,7 +289,6 @@ humanrefiner_data/
 
 1. **HumanRefiner 数据集**（主体数据）：含 8 类异常标注，是训练的主要来源
 2. **CrowdPose 数据集**（补充正常样本）：外部公开数据集，专门引入以增加复杂场景下的正常图片数量，从而提升模型的鲁棒性
-   - 下载来源：https://people.eecs.berkeley.edu/~pwang060/CrowdPose/
    - 数据格式：只需要复杂场景下的正常图片，标签统一设为 0（正常）
    - 放置位置：`data/crowdpose/` 目录下包含 `washed_images/` 和 `washed_multiple_labels/` 两个子目录
 3. **合成数据集**（sam_fusion.py 生成）：通过 mmdet+mmpose+SAM pipeline 合成的手部异常样本，扩充手部畸形类别
