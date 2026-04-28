@@ -121,7 +121,24 @@ aigcAnomalyDetect/
 | torchvision | >= 0.19 | 图像处理和模型 |
 | OpenMMLab MMPose | 0.10.7 | 人体关键点检测 |
 | MMDetection | 3.3.0 | 目标检测 |
-| MMCV | 2.1.0（mmpose_sk.py 中伪装为 2.1.0） | 基础框架 |
+**MMCV 版本冲突处理：**
+
+mmpose 0.10.7 和 mmdet 3.3.0 对 mmcv 版本的需求不同：
+- mmpose 需要 `mmcv>=1.5.0`（旧版 API）
+- mmdet 3.3.0 需要 `mmcv>=2.0.0`（新版 API）
+
+两者对 mmcv 版本的要求是冲突的。代码在 `mmpose_sk.py` 中通过版本伪装绕过检查：
+
+```python
+import mmcv
+mmcv.__version__ = '2.1.0'  # 欺骗 mmdet，让它以为我们用的是 2.1.0
+```
+
+**原理：** 代码先导入原始 mmcv 版本，然后通过修改 `mmcv.__version__` 字符串让 mmdet 的版本检测逻辑认为 mmcv 是 2.1.0 版本，从而通过 mmdet 的兼容性检查。
+
+**实际运行时使用的 mmcv 版本**：`mmcv>=2.0.0`（即 2.1.0），通过 `pip install mmcv==2.1.0` 安装。这个 hack 是必要的，因为 mmpose 和 mmdet 的代码在同一个脚本中运行，版本检测机制会严格检查 mmcv 版本。
+
+**不做这个 hack 的后果**：mmdet 的版本检测会失败，报错类似 `ValueError: mmcv version error`，导致 mmdet 无法导入。
 | NumPy | - | 数值计算 |
 | Pillow | - | 图像处理 |
 | Matplotlib | - | 可视化 |
@@ -174,6 +191,38 @@ pip install numpy Pillow matplotlib tqdm pyyaml opencv-python
 - 原始人体异常类型分为 7 类：头部异常、脖子异常、身体异常、手臂异常、手异常、腿异常、脚异常
 - 本项目去除 HumanRefiner 原始数据集的 bbox 属性，仅使用数据标签
 
+**原始目录结构：**
+
+```
+humanrefiner_data/
+├── images/                    # 原始图片（JPG/PNG）
+│   ├── 1.jpg
+│   ├── 2.jpg
+│   └── ...
+├── labels/                    # 标签文件（与图片同名）
+│   ├── 1.txt
+│   ├── 2.txt
+│   └── ...
+└── ...
+```
+
+**标签文件格式（`.txt`）：**
+
+每个标签文件与图片同名（如 `1.jpg` 对应 `1.txt`），每行格式为：
+
+```
+异常编号  x_min y_min x_max y_max
+```
+
+- 一行表示一个异常标注
+- 异常编号 1-8 对应 8 类异常，编号 9 表示非人类样本
+- 一个文件可以有多行，表示同一张图片存在多个异常
+- bbox 信息用于原始数据标注，本项目**不使用**，仅读取异常编号
+
+**文件对应关系：**
+
+图片与标签通过**文件名**（不含扩展名）一一对应，例如 `1.jpg` 对应 `1.txt`。
+
 ### 3.2 异常分类体系
 
 | 编号 | 异常类型 | 说明 |
@@ -223,7 +272,29 @@ pip install numpy Pillow matplotlib tqdm pyyaml opencv-python
    - 测试集：后 10%
 4. **软链接**：使用 `os.symlink()` 创建软链接，不复制文件
 
-**重组后的目录结构：**
+**重组数据源来自三个数据集：
+
+1. **HumanRefiner 数据集**（主体数据）：含 8 类异常标注，是训练的主要来源
+2. **CrowdPose 数据集**（补充正常样本）：外部公开数据集，专门引入以增加复杂场景下的正常图片数量，从而提升模型的鲁棒性
+3. **合成数据集**（sam_fusion.py 生成）：通过 mmdet+mmpose+SAM pipeline 合成的手部异常样本，扩充手部畸形类别
+
+**重组命令：**
+
+```bash
+# rearrange_data.py 内部流程：
+# 1. 从 HumanRefiner 的 data/rearranged_train/val 目录读取
+# 2. 从 CrowdPose 的 data/crowdpose/ 目录读取
+# 3. 从合成数据目录 data/fusion_result_*/ 读取
+# 4. 合并后 7:2:1 随机划分
+```
+
+**重组后的数据量：**
+
+| 子集 | 来源 | 图片数 | 说明 |
+|------|------|--------|------|
+| 训练集 | HumanRefiner + CrowdPose + 合成数据 | 50,459 | 含 8 类异常标签 |
+| 验证集 | HumanRefiner + CrowdPose + 合成数据 | 14,417 | 含 8 类异常标签 |
+| 测试集 | HumanRefiner + CrowdPose + 合成数据 | 7,209 | 含 8 类异常标签 |**
 
 ```
 rearranged_train/
@@ -327,21 +398,40 @@ class JointTransform:
 | 人体骨架 | RTMPose-L (COCO 17 keypoints) | 17 | kernel=45 | 0.4 |
 | 手部骨架 | RTMPose-M (COCO WHOLEBODY 21 keypoints) | 21 | kernel=25 | 0.2 |
 
-**骨架热力图缓存机制：**
+**骨架热力图生成与缓存机制（预生成模式）：**
 
-骨架热力图计算较慢，首次加载数据集时会缓存为 `.pt` 文件到 `cache_skeleton/` 目录，后续直接从缓存加载：
+骨架热力图计算较慢，项目采用**预生成模式**——在加载数据集之前先生成所有骨架缓存，而不是在训练时懒加载计算。
 
-```
-cache_skeleton/
-├── cache_body/          # 人体骨架缓存
-│   ├── train_xxx.pt
-│   └── ...
-└── cache_hand/          # 手部骨架缓存
-    ├── train_xxx.pt
-    └── ...
+```python
+# 训练/评估前必须先生成缓存：
+batch_pre_generate_all_skeleton(train_dataset, mode='both')
+batch_pre_generate_all_skeleton(val_dataset, mode='both')
+batch_pre_generate_all_skeleton(test_dataset, mode='both')
 ```
 
-缓存文件注释掉了自动保存逻辑（代码中 `torch.save` 行被注释），实际使用时需要手动开启。
+**旧机制（懒加载，已弃用）：** 在 `sk_dataset.py` 中缓存自动保存的逻辑已被注释：
+```python
+# torch.save(skeleton, skeleton_cache_path)  # 已弃用
+```
+
+不再使用在 `__getitem__` 时实时调用 mmpose 生成骨架的方法，因为：
+1. 每次加载都会触发 mmpose 推理，速度极慢
+2. 训练时可能超时或 OOM
+3. 验证/测试集如果图片有重叠的软链接，缓存可能冲突
+
+**新机制（预生成）：** 训练、验证、评估之前，统一先生成所有骨架缓存，再加载模型进行推理。`eval.py` 中也是先 `batch_generate_all_skeleton`，再做推理。
+
+**缓存目录结构（独立）：**
+
+缓存目录是独立的，存放在每个 split 目录下：
+
+```
+data/rearranged_train/cache_skeleton/
+data/rearranged_val/cache_skeleton/
+data/rearranged_test/cache_skeleton/
+```
+
+由于重组后每个目录使用带前缀的文件名（如 `train_xxx.jpg`），缓存文件名也带前缀（`train_xxx.pt`），不会冲突。
 
 ---
 
@@ -1324,13 +1414,24 @@ for _ in range(epoch_length):
 
 ### 7.8 华为数据集使用说明
 
-| 数据集 | 路径 | 用途 | 当前状态 |
-|--------|------|------|---------|
-| 源域数据 | `data/rearranged_train` | 预训练，作为基础域 | 已就绪，含 8 类异常标签 |
-| 目标域训练集 | `huawei_data/train` | 域自适应微调的训练数据 | 需要做好异常类型标注 |
-| 目标域测试集 | `huawei_data/test` | 微调后的评估数据 | 需要补充对应的图像和标签 |
+**数据来源：**
 
-**注意：** 华为数据集用于 fine-tune 部分，当前需要做好数据的异常类型标注（8 类异常：手部畸形、肢体缺失/增加、肢体/脸部模糊、脸部畸形、身体畸形等），以提升跨域性能。标注完成后即可用于域自适应微调，进一步提升在目标域上的精度和召回率。
+`huawei_data/` 包含两类数据：
+1. **华为内部 Z-Image ComfyUI 生成的图片** — 使用内部工具生成的 AIGC 人物图片
+2. **华为内部业务图片** — 真实业务场景下的人像图片
+
+248 张的数据量没有特别的数学原因，而是出于实际考虑：每张图片都需要人工审核质量，所以数据量不宜过大。
+
+**内部与外部复现者：**
+
+| 复现者类型 | 微调用数据 | 说明 |
+|-----------|-----------|------|
+| 华为内部 | `huawei_data/` | 可直接使用内部数据域自适应微调 |
+| 外部复现者 | 自有数据集 | 可替换为自己的域数据，或跳过域自适应微调直接使用预训练模型 |
+
+**使用建议：** 外部复现者如果无法获取华为内部数据，可以：
+1. 直接使用 `best_model_ema_opt.pth`（预训练模型）进行推理
+2. 用自己的目标域数据替换 `huawei_data/` 目录，重新执行域自适应微调
 
 ---
 
