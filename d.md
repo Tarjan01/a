@@ -84,7 +84,9 @@ aigcAnomalyDetect/
 │   ├── huawei_data/               # 华为域数据（微调用）
 │   │   ├── train/                 # 训练域（248 张）
 │   │   └── test/                  # 测试域（248 张）
-│   └── crowdpose_trainval.json    # CrowdPose 数据索引
+│   └── crowdpose/             # CrowdPose 正常样本目录
+│       ├── washed_images/     # 复杂场景下的正常人物图片
+│       └── washed_multiple_labels/  # 标签（全部为 0，表示正常）
 │
 ├── models_parameter/
 │   ├── resnet/
@@ -170,16 +172,26 @@ pip install numpy Pillow matplotlib tqdm pyyaml opencv-python
 
 ### 2.3 下载预训练模型
 
-项目代码中会自动从以下地址下载预训练权重：
+**自动下载（需网络通畅）：**
 
-| 模型 | 配置路径 | 权重地址 |
-|------|---------|---------|
-| RTMDet-Person | `mmpose/projects/rtmpose/rtmdet/person/rtmdet_m_640-8xb32_coco-person.py` | `rtmdet_m_8xb32-100e_coco-obj365-person-235e8209.pth` |
-| RTMPose-L Body (COCO 17 keypoints) | `mmpose/projects/rtmpose/rtmpose/body_2d_keypoint/rtmpose-l_8xb256-420e_coco-256x192.py` | `rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth` |
-| RTMDet-Hand | `mmpose/projects/rtmpose/rtmdet/hand/rtmdet_nano_320-8xb32_hand.py` | `rtmdet_nano_8xb32-300e_hand-267f9c8f.pth` |
-| RTMPose-M Hand (COCO WHOLEBODY 21 keypoints) | `mmpose/projects/rtmpose/rtmpose/hand_2d_keypoint/rtmpose-m_8xb32-210e_coco-wholebody-hand-256x256.py` | `rtmpose-m_simcc-hand5_pt-aic-coco_210e-256x256-74fb594_20230320.pth` |
+项目代码中会通过 `init_detector` 和 `init_model` 自动从 OpenMMLab 下载以下预训练权重：
 
-**SAM 模型：** 需手动下载 `sam_vit_h_4b8939.pth`（2.5 GB）到项目根目录。
+| 模型 | 完整 URL |
+|------|---------|
+| RTMDet-Person | `https://download.openmmlab.com/mmpose/v1/projects/rtmpose/rtmdet_m_8xb32-100e_coco-obj365-person-235e8209.pth` |
+| RTMPose-L Body | `https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth` |
+| RTMDet-Hand | `https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmdet_nano_8xb32-300e_hand-267f9c8f.pth` |
+| RTMPose-M Hand | `https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmpose-m_simcc-hand5_pt-aic-coco_210e-256x256-74fb594_20230320.pth` |
+
+**权重保存位置：** 下载到 `~/.cache/torch/hub/checkpoints/` 或当前工作目录。
+
+**SAM 模型（手动下载）：**
+
+```bash
+wget https://github.com/facebookresearch/segment-anything/releases/download/v1.0/sam_vit_h_4b8939.pth -O sam_vit_h_4b8939.pth
+```
+
+需手动下载 `sam_vit_h_4b8939.pth`（2.5 GB）到项目根目录。
 
 ---
 
@@ -276,6 +288,9 @@ humanrefiner_data/
 
 1. **HumanRefiner 数据集**（主体数据）：含 8 类异常标注，是训练的主要来源
 2. **CrowdPose 数据集**（补充正常样本）：外部公开数据集，专门引入以增加复杂场景下的正常图片数量，从而提升模型的鲁棒性
+   - 下载来源：https://people.eecs.berkeley.edu/~pwang060/CrowdPose/
+   - 数据格式：只需要复杂场景下的正常图片，标签统一设为 0（正常）
+   - 放置位置：`data/crowdpose/` 目录下包含 `washed_images/` 和 `washed_multiple_labels/` 两个子目录
 3. **合成数据集**（sam_fusion.py 生成）：通过 mmdet+mmpose+SAM pipeline 合成的手部异常样本，扩充手部畸形类别
 
 **重组命令：**
@@ -1007,11 +1022,18 @@ class FocalLoss(nn.Module):
 **pos_weights 计算：**
 
 ```python
+# 训练前一次性计算，不会每个 epoch 重新统计
+# 在 sk_resnet.py 第 278 行调用，数据在 train_dataset 初始化时统计
+label_counter = train_dataset.get_label_count()
+num_samples = len(train_dataset)
+
 for i in range(1, NUM_ABNORMAL_CLASSES + 1):
     pos = label_counter.get(i, 0)      # 正样本数
     neg = num_samples - pos            # 负样本数
     pos_weights.append(min(max((neg / max(pos, 1)) ** 0.5, 1.0), 10.0))
 ```
+
+`label_counter` 是在 `ImageWithSKMultiLabelDataset` 初始化时通过遍历所有文件统计的（见 `sk_dataset.py` 第 170-200 行），**每个 epoch 不会重新统计**。对于重组后 `rearranged_train/` 目录下的文件，`label_counter` 统计的是重组后的文件数，和原始文件无关。
 
 使用类别频率的平方根加权，范围限制在 [1.0, 10.0]。
 
@@ -1176,6 +1198,7 @@ for epoch in range(num_epochs):
     model.train()
 
     # 前 free_epochs(8) 轮冻结 backbone
+    # load_parameter 是硬编码的 bool 变量（sk_resnet.py 第 360 行）：load_parameter = False
     if epoch == free_epochs or load_parameter:
         for p in backbone_params:
             p.requires_grad = True
@@ -1271,13 +1294,16 @@ torchrun --nproc_per_node=4 sk_resnet.py  # 4 卡训练
 
 ### 6.6 缓存预生成
 
-训练开始前批量生成所有骨架缓存：
+训练开始前批量生成所有骨架缓存。这个函数定义在 `sk_resnet.py` 第 140 行，由 `sk_resnet.py` 第 183-185 行自动调用：
 
 ```python
+# 直接运行 python sk_resnet.py 会自动触发预生成，不需要单独运行
 batch_pre_generate_all_caches(train_dataset, mode='both')
 batch_pre_generate_all_caches(val_dataset, mode='both')
 batch_pre_generate_all_caches(test_dataset, mode='both')
 ```
+
+**注意：** 这个函数是内置函数，不是独立脚本。直接运行 `python sk_resnet.py` 会自动触发预生成。
 
 ### 6.7 保存的文件
 
@@ -1637,6 +1663,12 @@ Test Precision: 0.8880
 | 精确率 (Precision) | 100.00% | 88.80% | 误检率约 11% |
 | 损失 (Loss) | 1.1389 | 2.2994 | 测试集损失较高，存在域差异 |
 
+**说明：**
+- 验证集（huawei_data/train）与测试集（huawei_data/test）分布一致，因此验证集表现极好
+- 验证集 100% 准确率是因为：248 张数据量小，且是经过筛选的高质量标注样本，域自适应微调后又专门针对 huawei_data/train 优化过，所以验证集过拟合是正常的
+- 测试集表现略低，说明模型在未见过的数据上仍有提升空间
+- 召回率 95.12% 表示模型能找出 95% 以上的异常样本，满足实际需求
+
 ---
 
 ## 11. 完整复现步骤
@@ -1667,7 +1699,7 @@ git clone <project_url>
 cd aigcAnomalyDetect
 
 # 7. 下载 SAM 权重（手动）
-wget <sam_weight_url> -O sam_vit_h_4b8939.pth
+wget https://github.com/facebookresearch/segment-anything/releases/download/v1.0/sam_vit_h_4b8939.pth -O sam_vit_h_4b8939.pth
 
 # 8. 准备数据
 # 将原始 HumanRefiner 数据集放置在 data/ 目录下
