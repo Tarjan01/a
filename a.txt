@@ -1,390 +1,149 @@
-[Evaluating Source Training Set]
-Source Training Loss: 0.2254                                                              
-Source Metrics - TT: 27845, TF: 1578, FT: 2348, FF: 18688
+# 目标域调优任务书 · 第二阶段
 
-[Evaluating Target Validation Set]
-Target Val Loss: 6.9205                                                                   
-Target Metrics - TT: 0, TF: 170, FT: 1, FF: 111
+## 已完成实验结论汇总（不要重复做这些，直接基于结论往下走）
 
-Starting fine-tuning...
-Epoch 1/25 [Target]: 100%|█| 1577/1577 [04:02<00:00,  6.51it/s, loss=0.2053, multi=0.0336,
-Epoch 1/25 - Train Loss: 0.2586
+| 已验证结论 | 证据 |
+|---|---|
+| 阈值 0.5 不是目标域最优阈值 | 阈值重搜有一定提升 |
+| TTA 有效 | 3×TTA 带来 Acc/Recall 各 +3~4 点 |
+| Val→Test 存在明显 gap，且方向是 Recall 靠低阈值硬撑 | Val Acc71/Recall91 → Test Acc63/Recall84 |
+| **Head-only 微调 ≈ 略低于 full finetune，不是明显更差也不是更好** | 说明"参数量过大→过拟合"不是主因，但也不能反过来证明"全量微调没问题" |
+| Full finetune 在 train 上有明显过拟合，即使加了早停 | 训练日志：train loss 持续下降，target val loss epoch2 后持续上升 |
+| 目标域 train set 上概率就不偏离 0.5，即使 acc/recall 尚可 | 概率直方图观察 |
 
-============================================================
-Epoch 1/25 - Model Performance Evaluation
-============================================================
-                                                                                          
-[Source Training Set]
-  Loss: 0.2943
-  Metrics - TT: 28646, TF: 777, FT: 5060, FF: 15976
-                                                                                          
-[Target Validation Set]
-  Loss: 0.8291
-  Metrics - TT: 92, TF: 78, FT: 39, FF: 73
+**综合判断**：问题的根源不是"可训练参数太多"，而是 **backbone 提取的特征本身在目标域上判别性/可分性不足**，且当前微调方式（分类 loss 隐式驱动 + 学习率单一 + 一次性解冻）没能在稳定的前提下把这个可分性调出来。Head-only 打不过 full finetune 说明 backbone 确实需要适配目标域；但 full finetune 又不稳定/过拟合。**下一阶段的核心目标：让 backbone 适配目标域的过程更稳（分层学习率+渐进解冻+更强正则），同时用显式的判别性损失（对比学习）正面解决特征可分性问题，而不是继续依赖分类 loss 隐式指望特征自己分开。**
 
-  => New best model saved (val_loss: 0.8291)!
-============================================================
-Epoch 2/25 [Source]: 100%|█| 1577/1577 [04:01<00:00,  6.52it/s, loss=0.7453, multi=0.0444,
-Epoch 2/25 - Train Loss: 0.1746
+---
 
-============================================================
-Epoch 2/25 - Model Performance Evaluation
-============================================================
-                                                                                          
-[Source Training Set]
-  Loss: 0.3193
-  Metrics - TT: 28223, TF: 1200, FT: 5094, FF: 15942
-                                                                                          
-[Target Validation Set]
-  Loss: 0.7138
-  Metrics - TT: 120, TF: 50, FT: 43, FF: 69
+## 任务 A：稳定化 Full Finetune（优先级最高，成本低，直接改现有脚本）
 
-  => New best model saved (val_loss: 0.7138)!
-============================================================
-Epoch 3/25 [Target]:  32%|▎| 512/1577 [01:18<02:24,  7.36it/s, loss=0.1715, multi         Epoch 3/25 [Target]:  33%|▎| 513/1577 [01:18<02:24,  7.35it/s, loss=0.1715, multi         Epoch 3/25 [Target]:  33%|▎| 513/1577 [01:18<02:24,  7.35it/s, loss=0.1715, multi         Epoch 3/25 [Target]:  33%|▎| 513/1577 [01:18<02:24,  7.35it/s, loss=0.1960, multi         Epoch 3/25 [Target]:  33%|▎| 514/1577 [01:18<02:24,  7.38it/s, loss=0.1960, multi         Epoch 3/25 [Target]:  33%|▎| 514/1577 [01:18<02:24,  7.38it/s, loss=0.1960, multi         Epoch 3/25 [Target]:  33%|▎| 514/1577 [01:18<02:24,  7.38it/s, loss=0.2186, multi         Epoch 3/25 [Target]:  33%|▎| 515/1577 [01:18<02:23,  7.38it/s, loss=0.2186, multi         Epoch 3/25 [Source]:  33%|▎| 515/1577 [01:18<02:23,  7.38it/s, loss=0.2186, multi         Epoch 3/25 [Source]:  33%|▎| 515/1577 [01:18<02:23,  7.38it/s, loss=0.9219, multi         Epoch 3/25 [Source]:  33%|▎| 516/1577 [01:18<02:23,  7.41it/s, loss=0.9219, multi         Epoch 3/25 [Source]:  33%|▎| 516/1577 [01:18<02:23,  7.41it/s, loss=0.9219, multi         Epoch 3/25 [Source]:  33%|▎| 516/1577 [01:18<02:23,  7.41it/s, loss=0.3637, multi         Epoch 3/25 [Source]:  33%|▎| 517/1577 [01:18<02:23,  7.41it/s, loss=0.3637, multi         Epoch 3/25 [Target]:  33%|▎| 517/1577 [01:18<02:23,  7.41it/s, loss=0.3637, multi      Epoch 3/25 [Target]:  33%|▎| 517/1577 [01:18<02:23,  7.41it/s, loss=0.2310, multiEpoch 3/25 [Target]:  33%|▎| 518/1577 [01:18<02:22,  7.44it/s, loss=0.2310, multi         Epoch 3/25 [Source]:  33%|▎| 518/1577 [01:18<02:22,  7.44it/s, loss=0.2310, multi         Epoch 3/25 [Source]:  33%|▎| 518/1577 [01:19<02:22,  7.44it/s, loss=0.4461, multi=0.0303  Epoch 3/25 [Source]:  33%|▎| 519/1577 [01:19<02:21,  7.48it/s, loss=0.4461, multi=0.0303  Epoch 3/25 [Source]:  33%|▎| 519/1577 [01:19<02:21,  7.48it/s, loss=0.4461, multi=0.0303  Epoch 3/25 [Source]:  33%|▎| 519/1577 [01:19<02:21,  7.48it/s, loss=0.9493, multi=0.0493  Epoch 3/25 [Source]:  33%|▎| 520/1577 [01:19<02:21,  7.49it/s, loss=0.9493, multi=0.0493  Epoch 3/25 [Target]:  33%|▎| 520/1577 [01:19<02:21,  7.49it/s, loss=0.9493, multi=0.0493  Epoch 3/25 [Target]:  33%|▎| 520/1577 [01:19<02:21,  7.49it/s, loss=0.2617, multi=0.0362  Epoch 3/25 [Target]:  33%|▎| 521/1577 [01:19<02:20,  7.49it/s, loss=0.2617, multi=0.0362  Epoch 3/25 [Target]:  33%|▎| 521/1577 [01:19<02:20,  7.49it/s, loss=0.2617, multi=0.0362  Epoch 3/25 [Target]:  33%|▎| 521/1577 [01:19<02:20,  7.49it/s, loss=0.1310, multi=0.0307  Epoch 3/25 [Target]:  33%|▎| 522/1577 [01:19<02:20,  7.50it/s, loss=0.1310, multi=0.0307  Epoch 3/25 [Target]:  33%|▎| 522/1577 [01:19<02:20,  7.50it/s, loss=0.1310, multi=0.0307  Epoch 3/25 [Target]:  33%|▎| 522/1577 [01:19<02:20,  7.50it/s, loss=0.1736, multi=0.0547  Epoch 3/25 [Target]:  33%|▎| 523/1577 [01:19<02:19,  7.57it/s, loss=0.1736, multi=0.0547Epoch 3/25 [Target]:  33%|▎| 523/1577 [01:19<02:19,  7.57it/s, loss=0.1736, multi=0.0547  Epoch 3/25 [Target]:  33%|▎| 523/1577 [01:19<02:19,  7.57it/s, loss=0.2005, multi=0.0402  Epoch 3/25 [Target]:  33%|▎| 524/1577 [01:19<02:18,  7.62it/s, loss=0.2005, multi=0.0402  Epoch 3/25 [Source]:  33%|▎| 524/1577 [01:19<02:18,  7.62it/s, loss=0.2005, multi=0.0402  Epoch 3/25 [Source]:  33%|▎| 524/1577 [01:19<02:18,  7.62it/s, loss=0.2219, multi=0.0287  Epoch 3/25 [Source]:  33%|▎| 525/1577 [01:19<02:18,  7.62it/s, loss=0.2219, multi=0.0287  Epoch 3/25 [Target]:  33%|▎| 525/1577 [01:19<02:18,  7.62it/s, loss=0.2219, multi=0.0287  Epoch 3/25 [Target]:  33%|▎| 525/1577 [01:19<02:18,  7.62it/s, loss=0.1448, multi=0.0430  Epoch 3/25 [Target]:  33%|▎| 526/1577 [01:19<02:18,  7.60it/s, loss=0.1448, multi=0.0430  Epoch 3/25 [Source]:  33%|▎| 526/1577 [01:19<02:18,  7.60it/s, loss=0.1448, multi=0.0430  Epoch 3/25 [Source]: 100%|█| 1577/1577 [04:00<00:00,  6.56it/s, loss=0.2514, multi=0.0538,
-Epoch 3/25 - Train Loss: 0.1386
+### A.1 分层学习率（Discriminative Learning Rate）
 
-============================================================
-Epoch 3/25 - Model Performance Evaluation
-============================================================
-                                                                                          
-[Source Training Set]
-  Loss: 0.3336
-  Metrics - TT: 27895, TF: 1528, FT: 4880, FF: 16156
-                                                                                          
-[Target Validation Set]
-  Loss: 0.7779
-  Metrics - TT: 118, TF: 52, FT: 40, FF: 72
-============================================================
-Epoch 4/25 [Target]: 100%|█| 1577/1577 [04:01<00:00,  6.52it/s, loss=0.2676, multi=0.0723,
-Epoch 4/25 - Train Loss: 0.1139
+替换 `DomainFineTuner` 里 backbone 统一用 `lr=3e-5` 的做法，改为按 Stage 分层：
 
-============================================================
-Epoch 4/25 - Model Performance Evaluation
-============================================================
-                                                                                          
-[Source Training Set]
-  Loss: 0.3442
-  Metrics - TT: 27603, TF: 1820, FT: 4627, FF: 16409
-                                                                                          
-[Target Validation Set]
-  Loss: 0.8669
-  Metrics - TT: 122, TF: 48, FT: 39, FF: 73
-============================================================
-Epoch 5/25 [Source]: 100%|█| 1577/1577 [04:02<00:00,  6.50it/s, loss=0.5251, multi=0.0369,
-Epoch 5/25 - Train Loss: 0.1090
+```python
+param_groups = [
+    {"params": model.stem_conv.parameters(),  "lr": 1e-6},
+    {"params": model.stage1.parameters(),      "lr": 1e-6},
+    {"params": model.stage2.parameters(),      "lr": 3e-6},
+    {"params": model.stage3.parameters(),      "lr": 1e-5},
+    {"params": model.stage4.parameters(),      "lr": 3e-5},
+    {"params": inject_params,                  "lr": 1e-5},   # cross-attention 注入模块
+    {"params": fusion_params,                  "lr": 1e-4},   # 从 5e-4 降到 1e-4
+    {"params": head_params,                    "lr": 3e-5},
+]
+self.optimizer = optim.Adam(param_groups, weight_decay=1e-2)  # weight_decay 从 3e-3 提到 1e-2
+```
 
-============================================================
-Epoch 5/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.3411
-  Metrics - TT: 27737, TF: 1686, FT: 4554, FF: 16482
-                                                                                                
-[Target Validation Set]
-  Loss: 0.9083
-  Metrics - TT: 120, TF: 50, FT: 37, FF: 75
-============================================================
-Unfreezing backbone...
-Epoch 6/25 [Target]: 100%|█| 1577/1577 [04:08<00:00,  6.35it/s, loss=0.0669, multi=0.0317, binar
-Epoch 6/25 - Train Loss: 0.1001
+说明：Stage1-2 是低层通用特征（边缘/纹理），跨域差异小，给极小学习率保护；Stage3-4 更偏语义，给更大学习率充分适配；fusion 层是全连接容易记忆样本，学习率打下来防止快速过拟合。
 
-============================================================
-Epoch 6/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.3375
-  Metrics - TT: 27780, TF: 1643, FT: 4465, FF: 16571
-                                                                                                
-[Target Validation Set]
-  Loss: 0.9454
-  Metrics - TT: 126, TF: 44, FT: 40, FF: 72
-============================================================
-Epoch 7/25 [Target]: 100%|█| 1577/1577 [04:01<00:00,  6.52it/s, loss=0.0809, multi=0.0462, binar
-Epoch 7/25 - Train Loss: 0.0997
+### A.2 渐进式解冻（Progressive Unfreezing）
 
-============================================================
-Epoch 7/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.3288
-  Metrics - TT: 27851, TF: 1572, FT: 4376, FF: 16660
-                                                                                                
-[Target Validation Set]
-  Loss: 0.9500
-  Metrics - TT: 124, TF: 46, FT: 41, FF: 71
-============================================================
-Epoch 8/25 [Target]: 100%|█| 1577/1577 [04:02<00:00,  6.51it/s, loss=0.0936, multi=0.0329, binar
-Epoch 8/25 - Train Loss: 0.0876
+替换现在"5 epoch 后一次性全解冻 backbone"的逻辑，改成分阶段解冻：
 
-============================================================
-Epoch 8/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.3255
-  Metrics - TT: 27941, TF: 1482, FT: 4343, FF: 16693
-                                                                                                
-[Target Validation Set]
-  Loss: 0.9839
-  Metrics - TT: 125, TF: 45, FT: 36, FF: 76
-============================================================
-Epoch 9/25 [Target]: 100%|█| 1577/1577 [04:03<00:00,  6.48it/s, loss=0.0681, multi=0.0436, binar
-Epoch 9/25 - Train Loss: 0.0934
+```python
+# Epoch 1-5:   backbone 全冻结，只训练 head+fusion+cross-attention gamma
+# Epoch 6-9:   解冻 Stage4
+# Epoch 10-13: 解冻 Stage3
+# Epoch 14-17: 解冻 Stage2
+# Epoch 18+:   解冻 Stage1（如果前面已经收敛良好，这一步可选，Stage1 通常不需要动）
+```
 
-============================================================
-Epoch 9/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.3180
-  Metrics - TT: 27913, TF: 1510, FT: 4223, FF: 16813
-                                                                                                
-[Target Validation Set]
-  Loss: 1.0389
-  Metrics - TT: 124, TF: 46, FT: 35, FF: 77
-============================================================
-Epoch 10/25 [Target]: 100%|█| 1577/1577 [04:02<00:00,  6.51it/s, loss=0.0833, multi=0.0440, bina
-Epoch 10/25 - Train Loss: 0.0887
+实现要求：写一个 `unfreeze_schedule` 字典，训练循环里每个 epoch 开始时检查是否到达解冻节点，对应 `requires_grad_(True)`，并打印日志确认当前解冻状态。每次新解冻一个 stage 后，观察接下来 1-2 个 epoch 的 target val loss 是否出现之前那种"跳变式上涨"，如果有，说明这一步解冻的学习率还是偏大，需要进一步调低对应 stage 的 lr。
 
-============================================================
-Epoch 10/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.3157
-  Metrics - TT: 27993, TF: 1430, FT: 4231, FF: 16805
-                                                                                                
-[Target Validation Set]
-  Loss: 1.0262
-  Metrics - TT: 125, TF: 45, FT: 35, FF: 77
-============================================================
-Epoch 11/25 [Source]: 100%|█| 1577/1577 [04:03<00:00,  6.49it/s, loss=0.3161, multi=0.0327, bina
-Epoch 11/25 - Train Loss: 0.0871
+### A.3 更强的目标域数据增强
 
-============================================================
-Epoch 11/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.3148
-  Metrics - TT: 27864, TF: 1559, FT: 4057, FF: 16979
-                                                                                                
-[Target Validation Set]
-  Loss: 1.0536
-  Metrics - TT: 121, TF: 49, FT: 38, FF: 74
-============================================================
-Epoch 12/25 [Target]: 100%|█| 1577/1577 [04:01<00:00,  6.54it/s, loss=0.0552, multi=0.0306, bina
-Epoch 12/25 - Train Loss: 0.0820
+现在的增强参数（5度旋转、5%亮度对比度、仅水平翻转）是从源域大数据集场景抄过来的，对目标域几百张样本来说强度太弱，起不到扩充数据的作用。目标域专属增强建议：
 
-============================================================
-Epoch 12/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.3079
-  Metrics - TT: 27935, TF: 1488, FT: 4022, FF: 17014
-                                                                                                
-[Target Validation Set]
-  Loss: 1.0952
-  Metrics - TT: 118, TF: 52, FT: 35, FF: 77
-============================================================
-Epoch 13/25 [Target]: 100%|█| 1577/1577 [03:59<00:00,  6.60it/s, loss=0.0908, multi=0.0439, bina
-Epoch 13/25 - Train Loss: 0.0831
+```python
+target_transform = JointTransform(
+    input_size=224,
+    hflip_prob=0.5,
+    rotate_deg=15,          # 从 5 度提到 15 度
+    rotate_prob=0.7,
+    brightness=0.15,        # 从 0.05 提到 0.15
+    contrast=0.15,
+    brightness_prob=0.7,
+    contrast_prob=0.7,
+)
+```
 
-============================================================
-Epoch 13/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.3068
-  Metrics - TT: 28029, TF: 1394, FT: 4133, FF: 16903
-                                                                                                
-[Target Validation Set]
-  Loss: 1.1099
-  Metrics - TT: 121, TF: 49, FT: 38, FF: 74
-============================================================
-Epoch 14/25 [Target]: 100%|█| 1577/1577 [04:03<00:00,  6.49it/s, loss=0.0748, multi=0.0494, bina
-Epoch 14/25 - Train Loss: 0.0808
+新增：随机裁剪后 resize（RandomResizedCrop，scale=(0.85, 1.0)）、轻微色彩抖动（hue/saturation ±5%）。注意骨架热力图要跟着裁剪窗口做对应裁剪+resize，不能只处理 RGB 通道。
 
-============================================================
-Epoch 14/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.2991
-  Metrics - TT: 28109, TF: 1314, FT: 4052, FF: 16984
-                                                                                                
-[Target Validation Set]
-  Loss: 1.1693
-  Metrics - TT: 118, TF: 52, FT: 33, FF: 79
-============================================================
-Epoch 15/25 [Source]: 100%|█| 1577/1577 [04:02<00:00,  6.51it/s, loss=0.0872, multi=0.0233, bina
-Epoch 15/25 - Train Loss: 0.0808
+只对目标域训练集用这套增强，源域增强保持不变（避免源域这边引入过多噪声影响已经调好的部分）。
 
-============================================================
-Epoch 15/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.3014
-  Metrics - TT: 28013, TF: 1410, FT: 3998, FF: 17038
-                                                                                                
-[Target Validation Set]
-  Loss: 1.1121
-  Metrics - TT: 120, TF: 50, FT: 36, FF: 76
-============================================================
-Epoch 16/25 [Target]: 100%|█| 1577/1577 [03:59<00:00,  6.58it/s, loss=0.0791, multi=0.0415, bina
-Epoch 16/25 - Train Loss: 0.0784
 
-============================================================
-Epoch 16/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.2971
-  Metrics - TT: 28033, TF: 1390, FT: 3918, FF: 17118
-                                                                                                
-[Target Validation Set]
-  Loss: 1.1122
-  Metrics - TT: 121, TF: 49, FT: 32, FF: 80
-============================================================
-Epoch 17/25 [Target]: 100%|█| 1577/1577 [04:03<00:00,  6.47it/s, loss=0.0564, multi=0.0477, bina
-Epoch 17/25 - Train Loss: 0.0739
 
-============================================================
-Epoch 17/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.3025
-  Metrics - TT: 27871, TF: 1552, FT: 3865, FF: 17171
-                                                                                                
-[Target Validation Set]
-  Loss: 1.1685
-  Metrics - TT: 121, TF: 49, FT: 35, FF: 77
-============================================================
-Epoch 18/25 [Target]: 100%|█| 1577/1577 [03:58<00:00,  6.60it/s, loss=0.0882, multi=0.0652, bina
-Epoch 18/25 - Train Loss: 0.0807
+## 任务 B：监督对比损失（Supervised Contrastive Loss）—— 正面解决特征可分性问题
 
-============================================================
-Epoch 18/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.2974
-  Metrics - TT: 28031, TF: 1392, FT: 3974, FF: 17062
-                                                                                                
-[Target Validation Set]
-  Loss: 1.1376
-  Metrics - TT: 123, TF: 47, FT: 36, FF: 76
-============================================================
-Epoch 19/25 [Target]: 100%|█| 1577/1577 [04:02<00:00,  6.51it/s, loss=0.0425, multi=0.0344, bina
-Epoch 19/25 - Train Loss: 0.0779
+这是本阶段**最关键**的任务，直接针对"概率不偏离0.5、特征不可分"的根因。
 
-============================================================
-Epoch 19/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.2954
-  Metrics - TT: 28155, TF: 1268, FT: 4031, FF: 17005
-                                                                                                
-[Target Validation Set]
-  Loss: 1.0964
-  Metrics - TT: 123, TF: 47, FT: 36, FF: 76
-============================================================
-Epoch 20/25 [Target]: 100%|█| 1577/1577 [04:01<00:00,  6.52it/s, loss=0.0877, multi=0.0573, bina
-Epoch 20/25 - Train Loss: 0.0748
+### B.1 实现 SupCon Loss
 
-============================================================
-Epoch 20/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.2964
-  Metrics - TT: 28134, TF: 1289, FT: 3968, FF: 17068
-                                                                                                
-[Target Validation Set]
-  Loss: 1.1266
-  Metrics - TT: 122, TF: 48, FT: 37, FF: 75
-============================================================
-Epoch 21/25 [Target]: 100%|█| 1577/1577 [03:58<00:00,  6.61it/s, loss=0.0441, multi=0.0269, bina
-Epoch 21/25 - Train Loss: 0.0755
+在 `neck_projector` 输出（final_norm 之后的 768 维特征）上加监督对比损失：
 
-============================================================
-Epoch 21/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.2967
-  Metrics - TT: 27981, TF: 1442, FT: 3815, FF: 17221
-                                                                                                
-[Target Validation Set]
-  Loss: 1.1584
-  Metrics - TT: 121, TF: 49, FT: 39, FF: 73
-============================================================
-Epoch 22/25 [Target]: 100%|█| 1577/1577 [03:57<00:00,  6.65it/s, loss=0.0988, multi=0.0634, bina
-Epoch 22/25 - Train Loss: 0.0750
+```python
+class SupConLoss(nn.Module):
+    def __init__(self, temperature=0.1):
+        super().__init__()
+        self.temperature = temperature
 
-============================================================
-Epoch 22/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.2926
-  Metrics - TT: 27932, TF: 1491, FT: 3710, FF: 17326
-                                                                                                
-[Target Validation Set]
-  Loss: 1.2399
-  Metrics - TT: 117, TF: 53, FT: 35, FF: 77
-============================================================
-Epoch 23/25 [Target]: 100%|█| 1577/1577 [04:02<00:00,  6.50it/s, loss=0.0692, multi=0.0587, bina
-Epoch 23/25 - Train Loss: 0.0719
+    def forward(self, features, labels):
+        """
+        features: [B, D]，建议先做 L2 normalize
+        labels: [B]，二分类标签（0=正常，1=异常）用于确定正负对
+        """
+        features = F.normalize(features, dim=1)
+        B = features.size(0)
+        sim_matrix = torch.matmul(features, features.T) / self.temperature  # [B,B]
 
-============================================================
-Epoch 23/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.2893
-  Metrics - TT: 28100, TF: 1323, FT: 3871, FF: 17165
-                                                                                                
-[Target Validation Set]
-  Loss: 1.2428
-  Metrics - TT: 118, TF: 52, FT: 35, FF: 77
-============================================================
-Epoch 24/25 [Target]: 100%|█| 1577/1577 [04:02<00:00,  6.51it/s, loss=0.0318, multi=0.0239, bina
-Epoch 24/25 - Train Loss: 0.0730
+        labels = labels.view(-1, 1)
+        mask_positive = torch.eq(labels, labels.T).float().to(features.device)
+        mask_self = torch.eye(B, device=features.device)
+        mask_positive = mask_positive - mask_self  # 排除自己和自己
 
-============================================================
-Epoch 24/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.2913
-  Metrics - TT: 28120, TF: 1303, FT: 3905, FF: 17131
-                                                                                                
-[Target Validation Set]
-  Loss: 1.2478
-  Metrics - TT: 121, TF: 49, FT: 36, FF: 76
-============================================================
-Epoch 25/25 [Target]: 100%|█| 1577/1577 [04:03<00:00,  6.48it/s, loss=0.0309, multi=0.0224, bina
-Epoch 25/25 - Train Loss: 0.0703
+        exp_sim = torch.exp(sim_matrix) * (1 - mask_self)  # 排除自身相似度
+        log_prob = sim_matrix - torch.log(exp_sim.sum(dim=1, keepdim=True) + 1e-8)
 
-============================================================
-Epoch 25/25 - Model Performance Evaluation
-============================================================
-                                                                                                
-[Source Training Set]
-  Loss: 0.2926
-  Metrics - TT: 28152, TF: 1271, FT: 3979, FF: 17057
-                                                                                                
-[Target Validation Set]
-  Loss: 1.2945
-  Metrics - TT: 118, TF: 52, FT: 33, FF: 79
-============================================================
-Fine-tuning completed!
+        mask_positive_sum = mask_positive.sum(dim=1)
+        mask_positive_sum = torch.clamp(mask_positive_sum, min=1e-8)
+        loss = -(mask_positive * log_prob).sum(dim=1) / mask_positive_sum
+
+        return loss.mean()
+```
+
+### B.2 接入训练循环
+
+```python
+total_loss = (
+    1.0 * loss_multi
+    + 5.0 * loss_binary
+    + lambda_supcon * supcon_loss(neck_feat, binary_labels)
+)
+```
+
+`lambda_supcon` 建议从 0.3 开始，网格搜索 [0.1, 0.3, 0.5, 1.0]。
+
+**关键实现细节**：
+- SupCon 对 batch size 和正负样本比例敏感，一个 batch 里正负样本都要有足够数量（至少各 8 个），否则某一类缺正样本对，loss 会退化。建议用 `WeightedRandomSampler` 强制目标域 batch 里正负样本比例接近 1:1，不要用自然分布采样。
+- 只在目标域数据上算 SupCon（不需要对源域也算，源域已经收敛得比较好），或者源域和目标域分开算两次再加权求和，避免源域大量样本稀释目标域的对比信号。
+- SupCon 需要训练一定 epoch 才能看到特征分离效果，建议先跑 15-20 epoch 观察 t-SNE 变化趋势，不要提前用 val loss 判断"没用"就放弃。
+
+### B.3 验证方式（这一步比指标更重要）
+
+每隔 5 个 epoch，对目标域 train set 和 test set 分别画：
+1. neck feature 的 t-SNE/UMAP 图，按正常/异常上色，观察两类簇是否逐渐分离
+2. 二分类概率直方图，观察是否从"挤在0.5附近"逐渐变成双峰分布
+
+**这两张图比 Acc/Recall 数字更能说明 SupCon 是否真的在起作用**，之前单纯看指标已经被证明会掩盖真实问题（指标看着还行，但概率没有margin）。如果加了 SupCon 之后概率直方图依然没有明显双峰化，说明问题可能不在 loss 设计，而在于目标域异常本身的视觉特征跟源域差异过大，backbone 提取的中间特征承载不了这个语义（需要考虑任务C）。
+
+---
+
+
+
+## 执行顺序建议
+
+1. **任务 A（A.1+A.2+A.3）先做一轮**，这是在不改变整体框架的前提下让 full finetune 更稳，预期能缩小 val→test gap，缓解过拟合
+2. **在任务 A 稳定的基础上叠加任务 B（SupCon）**，这是预期能真正打开天花板的部分——重点看 t-SNE/概率直方图的变化，不要只看 Acc/Recall
+4. 每一步都在 test set 上验证，维护递进对比表：`baseline(现有full finetune) → +分层LR/渐进解冻/强增强/复合checkpoint(A) → +SupCon(B) → +bootstrap阈值(C)`，记录 Acc/Recall/Precision 以及 val→test gap 的变化
+5. 如果任务 B 做完，t-SNE 显示两类特征依然严重重叠、概率依然不分离，这是重要信号，说明问题可能出在**目标域异常类型和源域异常类型在视觉语义上本身就有较大差异**（比如华为域的成像风格/异常模式和 HumanRefiner 不同），这种情况下需要回到数据层面——重新看目标域几百张训练样本里，各类异常的视觉特征是否真的和源域定义的 8 类异常一致，必要时需要人工抽样核对标注一致性，而不是继续在模型/loss 层面调
