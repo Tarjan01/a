@@ -1,88 +1,28 @@
-# 目标域调优任务书 · 第二阶段
+# 目标域调优任务书 · Plan 2（SupCon 监督对比损失）
 
-## 已完成实验结论汇总（不要重复做这些，直接基于结论往下走）
+## 前置说明
 
-| 已验证结论 | 证据 |
-|---|---|
-| 阈值 0.5 不是目标域最优阈值 | 阈值重搜有一定提升 |
-| TTA 有效 | 3×TTA 带来 Acc/Recall 各 +3~4 点 |
-| Val→Test 存在明显 gap，且方向是 Recall 靠低阈值硬撑 | Val Acc71/Recall91 → Test Acc63/Recall84 |
-| **Head-only 微调 ≈ 略低于 full finetune，不是明显更差也不是更好** | 说明"参数量过大→过拟合"不是主因，但也不能反过来证明"全量微调没问题" |
-| Full finetune 在 train 上有明显过拟合，即使加了早停 | 训练日志：train loss 持续下降，target val loss epoch2 后持续上升 |
-| 目标域 train set 上概率就不偏离 0.5，即使 acc/recall 尚可 | 概率直方图观察 |
-
-**综合判断**：问题的根源不是"可训练参数太多"，而是 **backbone 提取的特征本身在目标域上判别性/可分性不足**，且当前微调方式（分类 loss 隐式驱动 + 学习率单一 + 一次性解冻）没能在稳定的前提下把这个可分性调出来。Head-only 打不过 full finetune 说明 backbone 确实需要适配目标域；但 full finetune 又不稳定/过拟合。**下一阶段的核心目标：让 backbone 适配目标域的过程更稳（分层学习率+渐进解冻+更强正则），同时用显式的判别性损失（对比学习）正面解决特征可分性问题，而不是继续依赖分类 loss 隐式指望特征自己分开。**
+- 本任务基于第二阶段任务书的**任务 A（分层学习率+渐进解冻+目标域增强）已经跑通/正在跑通**为前提
+- 跳过 label smoothing / mixup / EMA decay 调整，这些预期收益不明确，暂不做
+- **统一评估标准**：从本任务开始，所有 test set 评估一律使用 **3×TTA 推理 + bootstrap 阈值搜索**得到的阈值，不再对比"无TTA"版本，保证前后结果可比
 
 ---
 
-## 任务 A：稳定化 Full Finetune（优先级最高，成本低，直接改现有脚本）
+## Plan 2：监督对比损失（SupCon）落地
 
-### A.1 分层学习率（Discriminative Learning Rate）
+### 目标
 
-替换 `DomainFineTuner` 里 backbone 统一用 `lr=3e-5` 的做法，改为按 Stage 分层：
+直接解决"目标域概率分布挤在 0.5 附近、特征不可分"的根因，让 neck feature 空间里正常/异常两类样本产生真实的几何间隔（margin），而不是依赖分类 loss 隐式指望特征自己分开。
 
-```python
-param_groups = [
-    {"params": model.stem_conv.parameters(),  "lr": 1e-6},
-    {"params": model.stage1.parameters(),      "lr": 1e-6},
-    {"params": model.stage2.parameters(),      "lr": 3e-6},
-    {"params": model.stage3.parameters(),      "lr": 1e-5},
-    {"params": model.stage4.parameters(),      "lr": 3e-5},
-    {"params": inject_params,                  "lr": 1e-5},   # cross-attention 注入模块
-    {"params": fusion_params,                  "lr": 1e-4},   # 从 5e-4 降到 1e-4
-    {"params": head_params,                    "lr": 3e-5},
-]
-self.optimizer = optim.Adam(param_groups, weight_decay=1e-2)  # weight_decay 从 3e-3 提到 1e-2
-```
+### Step 1：实现 SupConLoss
 
-说明：Stage1-2 是低层通用特征（边缘/纹理），跨域差异小，给极小学习率保护；Stage3-4 更偏语义，给更大学习率充分适配；fusion 层是全连接容易记忆样本，学习率打下来防止快速过拟合。
-
-### A.2 渐进式解冻（Progressive Unfreezing）
-
-替换现在"5 epoch 后一次性全解冻 backbone"的逻辑，改成分阶段解冻：
+新建文件 `losses/supcon_loss.py`：
 
 ```python
-# Epoch 1-5:   backbone 全冻结，只训练 head+fusion+cross-attention gamma
-# Epoch 6-9:   解冻 Stage4
-# Epoch 10-13: 解冻 Stage3
-# Epoch 14-17: 解冻 Stage2
-# Epoch 18+:   解冻 Stage1（如果前面已经收敛良好，这一步可选，Stage1 通常不需要动）
-```
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-实现要求：写一个 `unfreeze_schedule` 字典，训练循环里每个 epoch 开始时检查是否到达解冻节点，对应 `requires_grad_(True)`，并打印日志确认当前解冻状态。每次新解冻一个 stage 后，观察接下来 1-2 个 epoch 的 target val loss 是否出现之前那种"跳变式上涨"，如果有，说明这一步解冻的学习率还是偏大，需要进一步调低对应 stage 的 lr。
-
-### A.3 更强的目标域数据增强
-
-现在的增强参数（5度旋转、5%亮度对比度、仅水平翻转）是从源域大数据集场景抄过来的，对目标域几百张样本来说强度太弱，起不到扩充数据的作用。目标域专属增强建议：
-
-```python
-target_transform = JointTransform(
-    input_size=224,
-    hflip_prob=0.5,
-    rotate_deg=15,          # 从 5 度提到 15 度
-    rotate_prob=0.7,
-    brightness=0.15,        # 从 0.05 提到 0.15
-    contrast=0.15,
-    brightness_prob=0.7,
-    contrast_prob=0.7,
-)
-```
-
-新增：随机裁剪后 resize（RandomResizedCrop，scale=(0.85, 1.0)）、轻微色彩抖动（hue/saturation ±5%）。注意骨架热力图要跟着裁剪窗口做对应裁剪+resize，不能只处理 RGB 通道。
-
-只对目标域训练集用这套增强，源域增强保持不变（避免源域这边引入过多噪声影响已经调好的部分）。
-
-
-
-## 任务 B：监督对比损失（Supervised Contrastive Loss）—— 正面解决特征可分性问题
-
-这是本阶段**最关键**的任务，直接针对"概率不偏离0.5、特征不可分"的根因。
-
-### B.1 实现 SupCon Loss
-
-在 `neck_projector` 输出（final_norm 之后的 768 维特征）上加监督对比损失：
-
-```python
 class SupConLoss(nn.Module):
     def __init__(self, temperature=0.1):
         super().__init__()
@@ -90,60 +30,128 @@ class SupConLoss(nn.Module):
 
     def forward(self, features, labels):
         """
-        features: [B, D]，建议先做 L2 normalize
-        labels: [B]，二分类标签（0=正常，1=异常）用于确定正负对
+        features: [B, D] —— 建议传入 L2 normalize 之前的原始 neck feature，函数内部会 normalize
+        labels:   [B]    —— 二分类标签 (0=正常, 1=异常)
         """
+        device = features.device
         features = F.normalize(features, dim=1)
         B = features.size(0)
+
         sim_matrix = torch.matmul(features, features.T) / self.temperature  # [B,B]
 
-        labels = labels.view(-1, 1)
-        mask_positive = torch.eq(labels, labels.T).float().to(features.device)
-        mask_self = torch.eye(B, device=features.device)
-        mask_positive = mask_positive - mask_self  # 排除自己和自己
+        labels = labels.contiguous().view(-1, 1)
+        mask_positive = torch.eq(labels, labels.T).float().to(device)
+        mask_self = torch.eye(B, device=device)
+        mask_positive = mask_positive - mask_self  # 排除自身
 
-        exp_sim = torch.exp(sim_matrix) * (1 - mask_self)  # 排除自身相似度
+        # 数值稳定：减去每行最大值
+        sim_max, _ = torch.max(sim_matrix, dim=1, keepdim=True)
+        sim_matrix = sim_matrix - sim_max.detach()
+
+        exp_sim = torch.exp(sim_matrix) * (1 - mask_self)
         log_prob = sim_matrix - torch.log(exp_sim.sum(dim=1, keepdim=True) + 1e-8)
 
-        mask_positive_sum = mask_positive.sum(dim=1)
-        mask_positive_sum = torch.clamp(mask_positive_sum, min=1e-8)
+        mask_positive_sum = torch.clamp(mask_positive.sum(dim=1), min=1e-8)
         loss = -(mask_positive * log_prob).sum(dim=1) / mask_positive_sum
 
-        return loss.mean()
+        # 过滤掉这个 batch 里没有任何正样本对的样本（该类在batch里只出现1次的情况）
+        valid = (mask_positive.sum(dim=1) > 0)
+        if valid.sum() == 0:
+            return torch.tensor(0.0, device=device, requires_grad=True)
+        return loss[valid].mean()
 ```
 
-### B.2 接入训练循环
+### Step 2：强制正负样本均衡采样
+
+SupCon 要求每个 batch 里正负样本都足够多，不能用自然分布采样（目标域本身可能类别不均衡）。
+
+新建/修改 `sk_dataset.py` 中的采样器：
 
 ```python
+from torch.utils.data import WeightedRandomSampler
+
+def make_balanced_sampler(dataset, binary_labels):
+    """
+    binary_labels: 数据集中每个样本的二分类标签列表 (0/1)
+    确保每个 batch 里正负样本比例接近 1:1
+    """
+    pos_count = sum(binary_labels)
+    neg_count = len(binary_labels) - pos_count
+    weight_pos = 1.0 / max(pos_count, 1)
+    weight_neg = 1.0 / max(neg_count, 1)
+    sample_weights = [weight_pos if l == 1 else weight_neg for l in binary_labels]
+    return WeightedRandomSampler(sample_weights, num_samples=len(binary_labels), replacement=True)
+```
+
+目标域 DataLoader 的 batch size 建议设为 32（保证每个 batch 至少 ~16 正 + ~16 负），如果目标域总样本数不够支撑这个 batch size 下的多样性，可以降到 24，但不要低于 16。
+
+### Step 3：接入训练循环
+
+修改 `DomainFineTuner`（复用 Plan A 已经做好的分层学习率+渐进解冻结构，在此基础上叠加）：
+
+```python
+from losses.supcon_loss import SupConLoss
+
+self.supcon_criterion = SupConLoss(temperature=0.1)
+self.lambda_supcon = 0.3  # 初始值，后续做网格搜索
+
+# 训练循环内（目标域 batch）：
+neck_feat = model.get_neck_feature(images, skeletons)  # 需要在模型里暴露这个中间输出，final_norm之后
+loss_supcon = self.supcon_criterion(neck_feat, binary_labels)
+
 total_loss = (
     1.0 * loss_multi
     + 5.0 * loss_binary
-    + lambda_supcon * supcon_loss(neck_feat, binary_labels)
+    + self.lambda_supcon * loss_supcon
 )
 ```
 
-`lambda_supcon` 建议从 0.3 开始，网格搜索 [0.1, 0.3, 0.5, 1.0]。
+**注意**：只对目标域 batch 计算 SupCon loss，源域 batch 不计算（源域已收敛良好，且源域体量大，算 SupCon 会拖慢训练且无必要）。
 
-**关键实现细节**：
-- SupCon 对 batch size 和正负样本比例敏感，一个 batch 里正负样本都要有足够数量（至少各 8 个），否则某一类缺正样本对，loss 会退化。建议用 `WeightedRandomSampler` 强制目标域 batch 里正负样本比例接近 1:1，不要用自然分布采样。
-- 只在目标域数据上算 SupCon（不需要对源域也算，源域已经收敛得比较好），或者源域和目标域分开算两次再加权求和，避免源域大量样本稀释目标域的对比信号。
-- SupCon 需要训练一定 epoch 才能看到特征分离效果，建议先跑 15-20 epoch 观察 t-SNE 变化趋势，不要提前用 val loss 判断"没用"就放弃。
+### Step 4：`lambda_supcon` 网格搜索
 
-### B.3 验证方式（这一步比指标更重要）
+分别跑 `lambda_supcon ∈ {0.1, 0.3, 0.5, 1.0}`，每组独立训练，用相同的 checkpoint 选择标准（A.4 复合指标）挑最优 epoch，在 test set 上用统一评估流程（3×TTA + bootstrap阈值）对比。
 
-每隔 5 个 epoch，对目标域 train set 和 test set 分别画：
-1. neck feature 的 t-SNE/UMAP 图，按正常/异常上色，观察两类簇是否逐渐分离
-2. 二分类概率直方图，观察是否从"挤在0.5附近"逐渐变成双峰分布
+### Step 5：训练过程可视化监控（比最终指标更重要）
 
-**这两张图比 Acc/Recall 数字更能说明 SupCon 是否真的在起作用**，之前单纯看指标已经被证明会掩盖真实问题（指标看着还行，但概率没有margin）。如果加了 SupCon 之后概率直方图依然没有明显双峰化，说明问题可能不在 loss 设计，而在于目标域异常本身的视觉特征跟源域差异过大，backbone 提取的中间特征承载不了这个语义（需要考虑任务C）。
+每 5 个 epoch，对目标域 train set 和 test set 分别产出：
+
+1. **t-SNE 图**：neck feature（768维）降到 2 维，正常/异常两色区分，观察随训练推进两类簇是否逐渐分离
+   ```python
+   from sklearn.manifold import TSNE
+   feat_2d = TSNE(n_components=2, perplexity=30, random_state=42).fit_transform(neck_features.cpu().numpy())
+   # 画散点图，按 binary_labels 上色，保存为 tsne_epoch{N}.png
+   ```
+2. **概率直方图**：`binary_logit` sigmoid 后的概率分布，正常/异常分开画（两个颜色的直方图叠在一起），观察是否从"挤在0.5附近"逐渐变成双峰分布
+
+这两组图保存到 `visualizations/supcon_lambda{X}/epoch{N}/`，方便横向对比不同 lambda 取值下特征分离的速度和程度。
+
+### Step 6：产出物要求
+
+1. 四组 `lambda_supcon` 取值的完整训练日志 + test set 最终指标（Acc/Recall/Precision/F1，含 TTA）
+2. 每组的 t-SNE 演变图（至少 epoch 5/10/15/20 四个时间点）+ 概率直方图演变图
+3. 一张总结表：
+
+| lambda_supcon | Test Acc | Test Recall | Test Precision | 概率分布是否双峰化 | t-SNE 是否分离 |
+|---|---|---|---|---|---|
+| 0（baseline，即Plan A结果） | | | | 否（已知） | 否（已知） |
+| 0.1 | | | | | |
+| 0.3 | | | | | |
+| 0.5 | | | | | |
+| 1.0 | | | | | |
+
+4. **明确结论**：如果所有 lambda 取值下 t-SNE 依然重叠、概率依然不双峰化，直接停止继续加大 lambda 或调超参数，转向数据层面排查（详见下方"退出条件"），不要在这个方向上无限试错
 
 ---
 
+## 退出条件：什么情况下该放弃继续调 SupCon，转向数据排查
 
+满足以下任意一条，就不要继续在 SupCon 超参/训练策略上试错，改为人工抽样核查目标域数据：
 
-## 执行顺序建议
+1. `lambda_supcon` 从 0.1 加到 1.0，t-SNE 上两类簇的重叠程度没有随 lambda 增大而肉眼可见地改善
+2. 概率直方图在 20 个 epoch 内始终没有出现双峰趋势（哪怕峰不明显，至少要看到往两端扩散的趋势）
+3. Test set 指标相对 Plan A baseline 没有提升，甚至因为 SupCon loss 干扰了分类 loss 的收敛导致下降
 
-1. **任务 A（A.1+A.2+A.3）先做一轮**，这是在不改变整体框架的前提下让 full finetune 更稳，预期能缩小 val→test gap，缓解过拟合
-2. **在任务 A 稳定的基础上叠加任务 B（SupCon）**，这是预期能真正打开天花板的部分——重点看 t-SNE/概率直方图的变化，不要只看 Acc/Recall
-4. 每一步都在 test set 上验证，维护递进对比表：`baseline(现有full finetune) → +分层LR/渐进解冻/强增强/复合checkpoint(A) → +SupCon(B) → +bootstrap阈值(C)`，记录 Acc/Recall/Precision 以及 val→test gap 的变化
-5. 如果任务 B 做完，t-SNE 显示两类特征依然严重重叠、概率依然不分离，这是重要信号，说明问题可能出在**目标域异常类型和源域异常类型在视觉语义上本身就有较大差异**（比如华为域的成像风格/异常模式和 HumanRefiner 不同），这种情况下需要回到数据层面——重新看目标域几百张训练样本里，各类异常的视觉特征是否真的和源域定义的 8 类异常一致，必要时需要人工抽样核对标注一致性，而不是继续在模型/loss 层面调
+此时下一步：从目标域训练集里，对"模型持续预测错误/低置信度"的样本（可以用 Plan A 的推理结果筛出来），抽取 20-30 张做人工复核，重点看：
+- 这些样本的异常类型标注是否和源域 8 类定义的视觉表现一致（比如源域"手异常"主要是多指/缺指，目标域如果"手异常"标注的是别的视觉模式，模型学的是完全不同的东西）
+- 目标域的成像风格（分辨率、光照、渲染方式）是否和源域差异大到骨架关键点检测（RTMPose）本身在目标域上就失准——如果骨架热力图输入本身质量差，会直接污染 cross-attention 注入的信息，这也会导致特征学不出判别性，且是 SupCon 无法解决的问题
